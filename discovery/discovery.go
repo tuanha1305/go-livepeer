@@ -17,7 +17,7 @@ import (
 	"github.com/golang/glog"
 )
 
-var getOrchestratorsTimeoutLoop = 3 * time.Second
+var getOrchestratorsTimeoutLoop = 1 * time.Second
 
 var serverGetOrchInfo = server.GetOrchestratorInfo
 

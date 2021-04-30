@@ -38,6 +38,8 @@ var MaxAttempts = 3
 var getOrchestratorInfoRPC = GetOrchestratorInfo
 var downloadSeg = drivers.GetSegmentData
 
+const MIN_SIZE = 1
+
 type BroadcastConfig struct {
 	maxPrice *big.Rat
 	mu       sync.RWMutex
@@ -84,7 +86,7 @@ func (bsm *BroadcastSessionsManager) selectSession() *BroadcastSession {
 
 	checkSessions := func(m *BroadcastSessionsManager) bool {
 		numSess := m.sel.Size()
-		if numSess < int(math.Ceil(float64(m.numOrchs)/2.0)) {
+		if numSess < int(math.Ceil(float64(m.numOrchs)/5.0)) {
 			go m.refreshSessions()
 		}
 		return (numSess > 0 || bsm.lastSess != nil)
@@ -266,7 +268,10 @@ func (bsm *BroadcastSessionsManager) cleanup() {
 }
 
 func (bsm *BroadcastSessionsManager) suspendOrch(sess *BroadcastSession) {
-	bsm.sus.suspend(sess.OrchestratorInfo.GetTranscoder(), bsm.poolSize/bsm.numOrchs)
+	poolSize := math.Max(MIN_SIZE, float64(bsm.poolSize))
+	selSize := math.Max(MIN_SIZE, float64(bsm.sel.Size()))
+	penalty := int(math.Ceil(poolSize / selSize))
+	bsm.sus.suspend(sess.OrchestratorInfo.GetTranscoder(), penalty)
 }
 
 func NewSessionManager(node *core.LivepeerNode, params *core.StreamParameters, sel BroadcastSessionsSelector) *BroadcastSessionsManager {

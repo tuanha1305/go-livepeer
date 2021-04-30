@@ -972,6 +972,7 @@ func TestTranscodeSegment_SuspendOrchestrator(t *testing.T) {
 	bsm := bsmWithSessList([]*BroadcastSession{sess})
 	bsm.poolSize = 40
 	bsm.numOrchs = 8
+	selSize := bsm.sel.Size()
 	cxn := &rtmpConnection{
 		mid:         core.ManifestID("foo"),
 		nonce:       7,
@@ -983,7 +984,7 @@ func TestTranscodeSegment_SuspendOrchestrator(t *testing.T) {
 	_, err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy"), Duration: 2.0}, "dummy", nil)
 
 	assert.EqualError(err, "OrchestratorBusy")
-	assert.Equal(bsm.sus.Suspended(ts.URL), bsm.poolSize/bsm.numOrchs)
+	assert.Equal(bsm.sus.Suspended(ts.URL), bsm.poolSize/selSize)
 }
 
 func TestTranscodeSegment_CompleteSession(t *testing.T) {
