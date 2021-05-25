@@ -302,9 +302,9 @@ func makeNetDetectData(ffmpegDetectData []ffmpeg.DetectData) []*net.DetectData {
 		var netData *net.DetectData
 		switch data.Type() {
 		case ffmpeg.SceneClassification:
-			d := data.(*ffmpeg.SceneClassificationData)
+			d := data.(ffmpeg.SceneClassificationData)
 			netClasses := make(map[uint32]*net.Fraction)
-			for classID, prob := range *d {
+			for classID, prob := range d {
 				netClasses[uint32(classID)] = &net.Fraction{
 					Num:   uint32(math.Round(prob * 1000)),
 					Denom: 1000,

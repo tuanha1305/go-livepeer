@@ -81,6 +81,7 @@ func (nv *NvidiaTranscoder) Transcode(md *SegTranscodingMetadata) (*TranscodeDat
 	_, seqNo, parseErr := parseURI(md.Fname)
 	start := time.Now()
 
+	glog.Warningf("!====    Here's the output config: %v", out)
 	res, err := nv.session.Transcode(in, out)
 	if err != nil {
 		return nil, err
@@ -164,7 +165,7 @@ func resToTranscodeData(res *ffmpeg.TranscodeResults, opts []ffmpeg.TranscodeOpt
 	}
 
 	// Convert results into in-memory bytes following the expected API
-	segments := make([]*TranscodedSegmentData, len(opts), len(opts))
+	segments := []*TranscodedSegmentData{}
 	// Extract detection data from detector outputs
 	detections := []ffmpeg.DetectData{}
 	for i := range opts {
@@ -174,13 +175,15 @@ func resToTranscodeData(res *ffmpeg.TranscodeResults, opts []ffmpeg.TranscodeOpt
 			glog.Error("Cannot read transcoded output for ", oname)
 			return nil, err
 		}
-		segments[i] = &TranscodedSegmentData{Data: o, Pixels: res.Encoded[i].Pixels}
-		os.Remove(oname)
 		if opts[i].Detector != nil {
 			detections = append(detections, res.Encoded[i].DetectData)
+		} else {
+			segments = append(segments, &TranscodedSegmentData{Data: o, Pixels: res.Encoded[i].Pixels})
 		}
+		os.Remove(oname)
 	}
 
+	glog.Warningf("===== TRANSCODER RESULT: %v", res.Encoded)
 	return &TranscodeData{
 		Segments:   segments,
 		Pixels:     res.Decoded.Pixels,
@@ -192,7 +195,7 @@ func profilesToTranscodeOptions(workDir string, accel ffmpeg.Acceleration, profi
 	opts := make([]ffmpeg.TranscodeOptions, len(profiles), len(profiles))
 	for i := range profiles {
 		o := ffmpeg.TranscodeOptions{
-			Oname:        fmt.Sprintf("%s/out_%s.tempfile", workDir, common.RandName()),
+			Oname:        fmt.Sprintf("%s/out_%s.ts", workDir, common.RandName()),
 			Profile:      profiles[i],
 			Accel:        accel,
 			AudioEncoder: ffmpeg.ComponentOptions{Name: "copy"},
@@ -208,10 +211,17 @@ func detectorsToTranscodeOptions(workDir string, accel ffmpeg.Acceleration, prof
 		var o ffmpeg.TranscodeOptions
 		switch profiles[i].Type() {
 		case ffmpeg.SceneClassification:
+			prof := profiles[i].(*ffmpeg.SceneClassificationProfile)
+			glog.Warningf("!====    Here's the detector profile: %v", *prof)
+			classifier := profiles[i].(*ffmpeg.SceneClassificationProfile)
+			classifier.ModelPath = "/home/darkapex/lp/tasmodel.pb"
+			classifier.Threshold = 0.0
+			classifier.Input = "input_1"
+			classifier.Output = "reshape_3/Reshape"
 			o = ffmpeg.TranscodeOptions{
-				Oname:        fmt.Sprintf("%s/out_%s.tempfile", workDir, common.RandName()),
+				Oname:        fmt.Sprintf("%s/out_%s.ts", workDir, common.RandName()),
 				Profile:      ffmpeg.P144p30fps16x9,
-				Detector:     profiles[i],
+				Detector:     classifier,
 				Accel:        accel,
 				AudioEncoder: ffmpeg.ComponentOptions{Name: "copy"},
 			}
