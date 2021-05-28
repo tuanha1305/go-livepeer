@@ -169,18 +169,18 @@ func resToTranscodeData(res *ffmpeg.TranscodeResults, opts []ffmpeg.TranscodeOpt
 	// Extract detection data from detector outputs
 	detections := []ffmpeg.DetectData{}
 	for i := range opts {
-		oname := opts[i].Oname
-		o, err := ioutil.ReadFile(oname)
-		if err != nil {
-			glog.Error("Cannot read transcoded output for ", oname)
-			return nil, err
-		}
-		if opts[i].Detector != nil {
-			detections = append(detections, res.Encoded[i].DetectData)
-		} else {
+		if opts[i].Detector == nil {
+			oname := opts[i].Oname
+			o, err := ioutil.ReadFile(oname)
+			if err != nil {
+				glog.Error("Cannot read transcoded output for ", oname)
+				return nil, err
+			}
 			segments = append(segments, &TranscodedSegmentData{Data: o, Pixels: res.Encoded[i].Pixels})
+			os.Remove(oname)
+		} else {
+			detections = append(detections, res.Encoded[i].DetectData)
 		}
-		os.Remove(oname)
 	}
 
 	glog.Warningf("===== TRANSCODER RESULT: %v", res.Encoded)
@@ -195,7 +195,7 @@ func profilesToTranscodeOptions(workDir string, accel ffmpeg.Acceleration, profi
 	opts := make([]ffmpeg.TranscodeOptions, len(profiles), len(profiles))
 	for i := range profiles {
 		o := ffmpeg.TranscodeOptions{
-			Oname:        fmt.Sprintf("%s/out_%s.ts", workDir, common.RandName()),
+			Oname:        fmt.Sprintf("%s/out_%s.tempfile", workDir, common.RandName()),
 			Profile:      profiles[i],
 			Accel:        accel,
 			AudioEncoder: ffmpeg.ComponentOptions{Name: "copy"},
@@ -214,16 +214,12 @@ func detectorsToTranscodeOptions(workDir string, accel ffmpeg.Acceleration, prof
 			prof := profiles[i].(*ffmpeg.SceneClassificationProfile)
 			glog.Warningf("!====    Here's the detector profile: %v", *prof)
 			classifier := profiles[i].(*ffmpeg.SceneClassificationProfile)
-			classifier.ModelPath = "/home/darkapex/lp/tasmodel.pb"
-			classifier.Threshold = 0.0
-			classifier.Input = "input_1"
-			classifier.Output = "reshape_3/Reshape"
+			classifier.ModelPath = fmt.Sprintf("%s/%s", workDir, ffmpeg.DSceneAdultSoccer.ModelPath)
+			classifier.Input = ffmpeg.DSceneAdultSoccer.Input
+			classifier.Output = ffmpeg.DSceneAdultSoccer.Output
 			o = ffmpeg.TranscodeOptions{
-				Oname:        fmt.Sprintf("%s/out_%s.ts", workDir, common.RandName()),
-				Profile:      ffmpeg.P144p30fps16x9,
-				Detector:     classifier,
-				Accel:        accel,
-				AudioEncoder: ffmpeg.ComponentOptions{Name: "copy"},
+				Detector: classifier,
+				Accel:    accel,
 			}
 		}
 		opts[i] = o
